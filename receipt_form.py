@@ -9,6 +9,8 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QTextDocument
 from PyQt5.QtPrintSupport import QPrinter, QPrintDialog, QPrintPreviewDialog
 from datetime import datetime
+from PyQt5.QtWidgets import QDateEdit
+from PyQt5.QtCore import QDate
 import win32print
 import json
 import path_utilis
@@ -200,6 +202,13 @@ class ReceiptFormApp(QMainWindow):
         self.buyer_name_input.setPlaceholderText("Enter buyer name")
         fields_layout.addRow("Buyer Name:", self.buyer_name_input)
         
+        self.date_input = QDateEdit()
+        self.date_input.setDate(QDate.currentDate())  # Set current date as default
+        self.date_input.setCalendarPopup(True)  # Enable calendar popup
+        self.date_input.setDisplayFormat("yyyy-MM-dd")  # Set display format
+        self.date_input.dateChanged.connect(self.update_receipt_preview)  # Add this line here
+        fields_layout.addRow("Date:", self.date_input)
+
         self.quantity_input = QDoubleSpinBox()
         self.quantity_input.setMinimum(0.01)
         self.quantity_input.setMaximum(999999.99)
@@ -514,7 +523,10 @@ class ReceiptFormApp(QMainWindow):
         for line in buyer_lines:
             receipt_text += line + "\n"
         
-        receipt_text += f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        selected_date = self.date_input.date().toString("yyyy-MM-dd")
+        current_time = datetime.now().strftime('%H:%M:%S')
+        receipt_text += f"Date: {selected_date} {current_time}\n"
+
         receipt_text += f"Receipt #: {self.receipt_serial}\n"
         receipt_text += "-" * 32 + "\n\n"
         
@@ -595,7 +607,7 @@ class ReceiptFormApp(QMainWindow):
         html += f"""
         </div>
         <div class="receipt-info">
-            <p><strong>Date:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p><strong>Date:</strong> {self.date_input.date().toString("yyyy-MM-dd")} {datetime.now().strftime('%H:%M:%S')}</p>
             <p><strong>Receipt #:</strong> {self.receipt_serial}</p>
         </div>
         

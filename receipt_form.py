@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QFormLayout, QLineEdit, QPushButton, 
                              QTextEdit, QListWidget, QLabel, QDoubleSpinBox, 
@@ -58,10 +59,11 @@ class SerialNumberManager:
         return str(self.current_serial).zfill(6)  # Pad with zeros to make 6 digits (000001, 0002, etc.)
 
 class ReceiptFormApp(QMainWindow):
-    def __init__(self, shop_folder=None):
+    def __init__(self, shop_folder=None, parent_window=None):
         super().__init__()
         self.base_path = path_utilis.get_base_path()
         self.shop_folder = shop_folder
+        self.parent_window = parent_window
         self.shop_info = self.load_shop_info()
         
         # Set up serial number manager with shop-specific path
@@ -75,6 +77,13 @@ class ReceiptFormApp(QMainWindow):
         self.items = []
         self.available_printers = self.get_available_printers()
         self.init_ui()
+
+    def closeEvent(self, event):
+        if self.parent_window is not None:
+            self.parent_window.showMaximized()
+            self.parent_window.raise_()
+            self.parent_window.activateWindow()
+        super().closeEvent(event)
     
     def load_shop_info(self):
         """Load shop information from shop_info.json"""
@@ -115,6 +124,16 @@ class ReceiptFormApp(QMainWindow):
         except Exception as e:
             print(f"Error getting printers: {e}")
             return ["Default Printer"]
+
+    def get_receipt_number(self):
+        custom_number = self.custom_number_input.text().strip()
+        if custom_number:
+            return f"{self.receipt_serial}_{custom_number}"
+        return self.receipt_serial
+
+    def get_safe_receipt_number(self):
+        receipt_number = self.get_receipt_number()
+        return re.sub(r'[^A-Za-z0-9_-]+', '_', receipt_number)
         
     def init_ui(self):
         # Update window title to include shop name
@@ -255,20 +274,20 @@ class ReceiptFormApp(QMainWindow):
         items_layout.addWidget(self.items_list)
         
         # List buttons
-        list_button_layout = QHBoxLayout()
+        # list_button_layout = QHBoxLayout()
         
-        self.edit_button = QPushButton("Edit Selected")
-        self.edit_button.clicked.connect(self.edit_selected_item)
-        self.edit_button.setEnabled(False)
+        # self.edit_button = QPushButton("Edit Selected")
+        # self.edit_button.clicked.connect(self.edit_selected_item)
+        # self.edit_button.setEnabled(False)
         
-        self.delete_button = QPushButton("Delete Selected")
-        self.delete_button.clicked.connect(self.delete_selected_item)
-        self.delete_button.setEnabled(False)
-        self.delete_button.setStyleSheet("QPushButton { background-color: #ff6b6b; color: white; }")
+        # self.delete_button = QPushButton("Delete Selected")
+        # self.delete_button.clicked.connect(self.delete_selected_item)
+        # self.delete_button.setEnabled(False)
+        # self.delete_button.setStyleSheet("QPushButton { background-color: #ff6b6b; color: white; }")
         
-        list_button_layout.addWidget(self.edit_button)
-        list_button_layout.addWidget(self.delete_button)
-        items_layout.addLayout(list_button_layout)
+        # list_button_layout.addWidget(self.edit_button)
+        # list_button_layout.addWidget(self.delete_button)
+        # items_layout.addLayout(list_button_layout)
         
         # Add form and items list to left layout
         left_layout.addWidget(form_frame)
@@ -289,6 +308,15 @@ class ReceiptFormApp(QMainWindow):
         # Print settings group
         print_group = QGroupBox("Print & Save Settings")
         print_layout = QVBoxLayout(print_group)
+
+        # Custom receipt suffix
+        custom_layout = QHBoxLayout()
+        custom_layout.addWidget(QLabel("Custom Number:"))
+        self.custom_number_input = QLineEdit()
+        self.custom_number_input.setPlaceholderText("Optional")
+        self.custom_number_input.textChanged.connect(self.update_receipt_preview)
+        custom_layout.addWidget(self.custom_number_input)
+        print_layout.addLayout(custom_layout)
         
         # Printer selection
         printer_layout = QHBoxLayout()
@@ -369,13 +397,13 @@ class ReceiptFormApp(QMainWindow):
             self.serial_manager.current_serial = new_serial
             self.serial_manager.save_serial_number(new_serial)
             
-            # Update current receipt display
+            # Update current fixed serial display
             self.receipt_serial = str(new_serial + 1).zfill(6)
             self.update_receipt_preview()
             
             QMessageBox.information(self, "Serial Updated", 
                                 f"Serial number updated!\n"
-                                f"Next receipt will be: {self.receipt_serial}")
+                                f"Next fixed serial will be: {self.receipt_serial}")
         
     def add_item(self):
         # Validate inputs
@@ -449,8 +477,8 @@ class ReceiptFormApp(QMainWindow):
                 
     def on_selection_changed(self):
         has_selection = bool(self.items_list.currentItem())
-        self.edit_button.setEnabled(has_selection)
-        self.delete_button.setEnabled(has_selection)
+        # self.edit_button.setEnabled(has_selection)
+        # self.delete_button.setEnabled(has_selection)
         
     def update_receipt_preview(self):
         if not self.items:
@@ -527,7 +555,7 @@ class ReceiptFormApp(QMainWindow):
         current_time = datetime.now().strftime('%H:%M:%S')
         receipt_text += f"Date: {selected_date} {current_time}\n"
 
-        receipt_text += f"Receipt #: {self.receipt_serial}\n"
+        receipt_text += f"Receipt #: {self.get_receipt_number()}\n"
         receipt_text += "-" * 32 + "\n\n"
         
         # Table header
@@ -608,7 +636,7 @@ class ReceiptFormApp(QMainWindow):
         </div>
         <div class="receipt-info">
             <p><strong>Date:</strong> {self.date_input.date().toString("yyyy-MM-dd")} {datetime.now().strftime('%H:%M:%S')}</p>
-            <p><strong>Receipt #:</strong> {self.receipt_serial}</p>
+            <p><strong>Receipt #:</strong> {self.get_receipt_number()}</p>
         </div>
         
         <table class="items-table">
@@ -733,7 +761,7 @@ class ReceiptFormApp(QMainWindow):
         
         # Generate filename
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"Receipt_{timestamp}_{self.receipt_serial}.pdf"
+        filename = f"Receipt_{timestamp}_{self.get_safe_receipt_number()}.pdf"
         
         if auto_save:
             # Use the specified folder for auto-save

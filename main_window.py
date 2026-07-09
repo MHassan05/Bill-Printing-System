@@ -24,6 +24,8 @@ class ClickableWidget(QWidget):
         self.setMouseTracking(True)
 
     def mousePressEvent(self, event):
+        if event.button() != Qt.LeftButton:
+            return
         widget_width = self.width()
         click_x = event.pos().x()
         if click_x < widget_width - 120:
@@ -229,7 +231,7 @@ class MainWindow(QMainWindow):
                                 background-color: #3d8b40;
                             }
                         """)
-                        edit_btn.clicked.connect(lambda checked, shop=shop_folder: self.edit_shop(shop))
+                        edit_btn.clicked.connect(lambda checked=False, shop=shop_folder: self.edit_shop(shop))
                         
                         # Delete button
                         delete_btn = QPushButton("🗑️ Delete")
@@ -250,7 +252,7 @@ class MainWindow(QMainWindow):
                                 background-color: #c41411;
                             }
                         """)
-                        delete_btn.clicked.connect(lambda checked, shop=shop_folder: self.delete_shop(shop))
+                        delete_btn.clicked.connect(lambda checked=False, shop=shop_folder: self.delete_shop(shop))
                         
                         buttons_layout.addWidget(edit_btn)
                         buttons_layout.addWidget(delete_btn)
@@ -344,8 +346,9 @@ class MainWindow(QMainWindow):
 
     def enter_shop_by_name(self, shop_folder):
         try:
-            self.receipt_form = ReceiptFormApp(shop_folder)
-            self.receipt_form.show()
+            self.receipt_form = ReceiptFormApp(shop_folder, parent_window=self)
+            self.hide()
+            self.receipt_form.showMaximized()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not open receipt form: {str(e)}")
 

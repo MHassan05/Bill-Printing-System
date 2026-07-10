@@ -51,6 +51,16 @@ class SerialNumberManager:
                 f.write(str(serial))
         except Exception as e:
             print(f"Error saving serial number: {e}")
+
+    def peak_next_serial(self): 
+        # just preview, don't increment or save 
+        return str(self.current_serial + 1).zfill(6) 
+    
+    def commit_serial(self):
+        """Call this after a serial number shown by peak_next_serial has actually been used."""
+        self.current_serial += 1
+        self.save_serial_number(self.current_serial)
+
     
     def get_next_serial(self):
         # Increment the counter first, then return the formatted number
@@ -73,7 +83,7 @@ class ReceiptFormApp(QMainWindow):
             shop_folder_path = self.base_path
         
         self.serial_manager = SerialNumberManager(shop_folder_path)
-        self.receipt_serial = self.serial_manager.get_next_serial()
+        self.receipt_serial = self.serial_manager.peak_next_serial() 
         self.items = []
         self.available_printers = self.get_available_printers()
         self.init_ui()
@@ -92,7 +102,8 @@ class ReceiptFormApp(QMainWindow):
                 "shop_name": "Default Shop",
                 "owner_name": "N/A",
                 "address": "N/A",
-                "mobile_numbers": []
+                "mobile_numbers": [],
+                "pdf_path": os.path.expanduser("~/Documents")
             }
         
         try:
@@ -101,7 +112,9 @@ class ReceiptFormApp(QMainWindow):
             
             if os.path.exists(info_path):
                 with open(info_path, 'r') as f:
-                    return json.load(f)
+                    info = json.load(f)
+                    info.setdefault('pdf_path', shop_path)
+                    return info
         except Exception as e:
             print(f"Error loading shop info: {e}")
         
@@ -110,7 +123,8 @@ class ReceiptFormApp(QMainWindow):
             "shop_name": "Unknown Shop",
             "owner_name": "N/A",
             "address": "N/A",
-            "mobile_numbers": []
+            "mobile_numbers": [],
+            "pdf_path": shop_path if self.shop_folder else os.path.expanduser("~/Documents")
         }
         
     def get_available_printers(self):
@@ -333,10 +347,15 @@ class ReceiptFormApp(QMainWindow):
         self.pdf_path_input.setPlaceholderText("Choose folder to save PDF")
         
         # Set default PDF save location to shop folder or Documents
-        if self.shop_folder:
-            default_pdf_path = os.path.join(self.base_path, 'data', self.shop_folder)
-        else:
-            default_pdf_path = os.path.expanduser("~/Documents")
+        # if self.shop_folder:
+        #     default_pdf_path = os.path.join(self.base_path, 'data', self.shop_folder)
+        # else:
+        #     default_pdf_path = os.path.expanduser("~/Documents")
+        # self.pdf_path_input.setText(default_pdf_path)
+
+        default_pdf_path = self.shop_info.get('pdf_path')
+        if not default_pdf_path or not os.path.isdir(default_pdf_path):
+            default_pdf_path = os.path.join(self.base_path, 'data', self.shop_folder) if self.shop_folder else os.path.expanduser("~/Documents")
         self.pdf_path_input.setText(default_pdf_path)
         
         self.browse_button = QPushButton("Browse")
@@ -595,6 +614,29 @@ class ReceiptFormApp(QMainWindow):
                                                  self.pdf_path_input.text())
         if folder:
             self.pdf_path_input.setText(folder)
+            self.shop_info['pdf_path'] = folder
+            self.save_shop_info()
+
+    def save_shop_info(self):
+        if not self.shop_folder:
+            return
+        try:
+            shop_path = os.path.join(self.base_path, 'data', self.shop_folder)
+            os.makedirs(shop_path, exist_ok=True)
+            info_path = os.path.join(shop_path, 'shop_info.json')
+
+            # Re-read current file so we never clobber fields we didn't touch
+            current = {}
+            if os.path.exists(info_path):
+                with open(info_path, 'r') as f:
+                    current = json.load(f)
+
+            current.update(self.shop_info)   # merge, don't replace
+
+            with open(info_path, 'w') as f:
+                json.dump(current, f, indent=4)
+        except Exception as e:
+            print(f"Error saving shop info: {e}")
     
     def get_receipt_html(self):
         """Generate HTML version of receipt for printing/PDF"""
@@ -794,6 +836,10 @@ class ReceiptFormApp(QMainWindow):
                 document.setHtml(self.get_receipt_html())
                 document.setPageSize(custome_size)
                 document.print_(printer)
+                self.serial_manager.commit_serial()
+                self.receipt_serial = self.serial_manager.peak_next_serial()
+                self.update_receipt_preview() 
+
                 
                 if not auto_save:
                     QMessageBox.information(self, "Success", f"PDF saved successfully!\n{file_path}")

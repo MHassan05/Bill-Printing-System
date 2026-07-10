@@ -555,7 +555,7 @@ class ReceiptFormApp(QMainWindow):
         current_time = datetime.now().strftime('%H:%M:%S')
         receipt_text += f"Date: {selected_date} {current_time}\n"
 
-        receipt_text += f"Receipt #: {self.get_receipt_number()}\n"
+        receipt_text += f"Receipt#: {self.get_receipt_number()}\n"
         receipt_text += "-" * 32 + "\n\n"
         
         # Table header
@@ -636,7 +636,7 @@ class ReceiptFormApp(QMainWindow):
         </div>
         <div class="receipt-info">
             <p><strong>Date:</strong> {self.date_input.date().toString("yyyy-MM-dd")} {datetime.now().strftime('%H:%M:%S')}</p>
-            <p><strong>Receipt #:</strong> {self.get_receipt_number()}</p>
+            <p><strong>Receipt#:</strong> {self.get_receipt_number()}</p>
         </div>
         
         <table class="items-table">
@@ -760,8 +760,9 @@ class ReceiptFormApp(QMainWindow):
             return
         
         # Generate filename
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"Receipt_{timestamp}_{self.get_safe_receipt_number()}.pdf"
+        # timestamp = datetime.now().strftime('%Y%m%d')
+        # filename = f"Receipt_{timestamp}_{self.get_safe_receipt_number()}.pdf"
+        filename = f"{self.get_safe_receipt_number()}.pdf"
         
         if auto_save:
             # Use the specified folder for auto-save
